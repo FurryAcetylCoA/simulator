@@ -118,7 +118,8 @@ std::string updateActiveStr(int idx, uint64_t mask, std::string& cond, int uniqu
   auto activeFlags = std::string("activeFlags[") + std::to_string(idx) + std::string("]");
 
   if (mask <= MAX_U8) {
-    if (uniqueId >= 0) return format("%s |= %s << %d;", activeFlags.c_str(), cond.c_str(), uniqueId);
+    if (uniqueId > 0) return format("%s |= %s << %d;", activeFlags.c_str(), cond.c_str(), uniqueId);
+    if (uniqueId == 0) return format("%s |= %s;", activeFlags.c_str(), cond.c_str());
     else return format("%s |= -(uint8_t)%s & 0x%lx;", activeFlags.c_str(), cond.c_str(), mask, activeFlags.c_str());
   }
   if (mask <= MAX_U16)
@@ -569,11 +570,12 @@ void graph::nodeDisplay(Node* member) {
       s += "|%%lx"; \
     } \
     s += "\", "; \
-    for (n --; n >= 0; n --) { \
+    for (n --; n > 0; n --) { \
       s += format("(uint64_t)(%s >> %d)", varname, n * 64); \
-      if (n != 0) s += ", "; \
-    } \
-    s += ");"; \
+      s += ", "; \
+    }\
+    s += format("(uint64_t)%s",varname);\
+    s += ");\n"; \
     emitBodyLock(s.c_str()); \
   } while (0)
 
