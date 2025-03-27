@@ -223,9 +223,10 @@ FILE* graph::genHeaderStart() {
     for (int i = num; i > 0; i --) param += format(i == num ? "_%d" : ", _%d", i);
     std::string value;
     std::string type = widthUType(num * 64);
-    for (int i = num; i > 0; i --) {
+    for (int i = num; i > 1; i --) {
       value += format(i == num ? "((%s)_%d << %d) " : "| ((%s)_%d << %d)", type.c_str(), i, (i-1) * 64);
     }
+    value += format("| ((%s)_1)", type.c_str());
     fprintf(header, "#define UINT_CONCAT%d(%s) (%s)\n", num, param.c_str(), value.c_str());
   }
   for (std::string str : extDecl) fprintf(header, "%s\n", str.c_str());
