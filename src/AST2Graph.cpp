@@ -1803,6 +1803,39 @@ void updatePrevNext(Node* n) {
   }
 }
 
+static ExpTree* allocRWCond(graph *g, Node *node){
+  Assert(node->assignTree.size() !=0, "no writer");
+  ENode* writeRoot = node->assignTree.back()->getRoot();
+  ENode* cond = new ENode(OP_AND);
+  Assert(writeRoot->opType == OP_WHEN, "invalid writer");
+  cond->addChild(writeRoot->getChild(0)->dup());
+  writeRoot = writeRoot->getChild(1);
+  Assert(writeRoot && writeRoot->opType == OP_WHEN, "invalid writer2");
+  ENode* notENode = new ENode(OP_NOT);
+  notENode->addChild(writeRoot->getChild(0)->dup());
+  cond->addChild(notENode);
+
+  Node* cond_src = allocNode(NODE_REG_SRC, format("%s%s%s", node->name.c_str(), SEP_AGGR, "COND"), node->lineno);
+  g->addReg(cond_src);
+  Node* cond_dst = cond_src->dup();
+  cond_dst->type = NODE_REG_DST;
+  cond_dst->name += format("%s%s",SEP_AGGR, "NEXT");
+  addSignal(cond_src->name, cond_src);
+  addSignal(cond_dst->name, cond_dst);
+  cond_src->bindReg(cond_dst);
+  cond_src->clock = cond_dst->clock = node->clock;
+  cond_src->valTree = new ExpTree(cond, cond_src);
+  ENode* resetCond = allocIntEnode(1, "0");
+  cond_src->resetCond = new ExpTree(resetCond, cond_src);
+  cond_src->resetVal = new ExpTree(new ENode(cond_src), cond_src);
+
+  ENode* whenNode = new ENode(OP_WHEN);
+  whenNode->addChild(new ENode(cond_src));
+  whenNode->addChild(node->memTree->getRoot());
+  whenNode->addChild(allocIntEnode(1, "0"));
+  ExpTree *newTree = new ExpTree(whenNode, new ENode(node));
+  return newTree;
+}
 
 /*
   traverse the AST and generate graph
@@ -1842,15 +1875,35 @@ graph* AST2Graph(PNode* root) {
       node->valTree = nullptr;
     }
     if (node->type == NODE_READWRITER) {
+      ExpTree* newTree;
       if (node->parent->rlatency == 1) {
         Node* addrReg = allocAddrNode(g, node);
         node->memTree->getRoot()->setChild(0, new ENode(addrReg));
+        newTree = allocRWCond(g, node);
+      }else{
+        Assert(node->assignTree.size() != 0, "no writer for %s", node->name.c_str());
+        ENode* writeRoot = node->assignTree.back()->getRoot();
+        ENode* cond = new ENode(OP_AND);
+        Assert(writeRoot->opType == OP_WHEN, "invalid writer for %s", node->name.c_str());
+        cond->addChild(writeRoot->getChild(0)->dup());
+        writeRoot = writeRoot->getChild(1);
+        Assert(writeRoot && writeRoot->opType == OP_WHEN, "invalid writer 3");
+        ENode* notENode = new ENode(OP_NOT);
+        notENode->addChild(writeRoot->getChild(0)->dup());
+        cond->addChild(notENode);
+        ENode* whenNode = new ENode(OP_WHEN);
+        whenNode->addChild(cond);
+        whenNode->addChild(node->memTree->getRoot());
+        whenNode->addChild(allocIntEnode(1, "0"));
+        newTree = new ExpTree(whenNode, new ENode(node));
       }
 
       if (node->parent->extraInfo == "new") {
-        node->assignTree.push_back(node->memTree);
+        // node->assignTree.push_back(node->memTree);
+        node->assignTree.push_back(newTree);
       } else {
-        node->assignTree.insert(node->assignTree.begin(), node->memTree);
+        // node->assignTree.insert(node->assignTree.begin(), node->memTree);
+        node->assignTree.insert(node->assignTree.begin(), newTree);
       }
     }
   }
