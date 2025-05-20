@@ -183,11 +183,11 @@ static std::string arrayCopy(std::string lvalue, Node* node, valInfo* rinfo, int
   } else {
     std::string idxStr, bracket;
     for (size_t i = 0; i < node->dimension.size() - dimIdx; i ++) {
-      ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) {\n", i, i, node->dimension[i + dimIdx], i);
+      ret += format("for(int i%ld = 0; i%ld < %d; i%ld ++) { ", i, i, node->dimension[i + dimIdx], i);
       idxStr += "[i" + std::to_string(i) + "]";
-      bracket += "}\n";
+      bracket += "}";
     }
-    ret += format("%s%s = %s;\n", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
+    ret += format("%s%s = %s; ", lvalue.c_str(), idxStr.c_str(), rinfo->valStr.c_str());
     ret += bracket;
   }
   return ret;
@@ -1939,21 +1939,51 @@ valInfo* Node::compute() {
   return ret;
 }
 
-void StmtNode::compute(std::vector<InstInfo>& insts) {
+void StmtNode::compute(std::vector<InstInfo>& insts, std::set<InstInfo> assign_insts[]) {
   switch (type) {
     case OP_STMT_SEQ:
       for (StmtNode* stmt : child) {
-        stmt->compute(insts);
+        stmt->compute(insts, assign_insts);
       }
       break;
     case OP_STMT_WHEN: {
       Assert(getChild(0)->isENode, "invalid when condition\n");
+      std::set<InstInfo> insts_branch_assign[2]; // Collector for all the SUPER_INFO_ASSIGN_{BEG/END}
       valInfo* cond = getChild(0)->enode->compute(nullptr, INVALID_LVALUE, false);
-      insts.push_back(InstInfo(format("if %s {", addBracket(cond->valStr).c_str()), SUPER_INFO_IF));
-      getChild(1)->compute(insts);
-      insts.push_back(InstInfo("} else {", SUPER_INFO_ELSE));
-      getChild(2)->compute(insts);
-      insts.push_back(InstInfo("}", SUPER_INFO_DEDENT));
+      insts.emplace_back(format("if %s {", addBracket(cond->valStr).c_str()), SUPER_INFO_IF);
+      auto if_marker = insts.size() - 1;
+      getChild(1)->compute(insts,insts_branch_assign);
+      /* Don't emit empty else block */
+      if (!getChild(2)->child.empty()) {
+        insts.emplace_back("} else {", SUPER_INFO_ELSE);
+        getChild(2)->compute(insts, insts_branch_assign);
+      }
+      insts.emplace_back("}", SUPER_INFO_DEDENT); // if block
+/*
+ * Deduplicate SUPER_INFO_ASSIGN_{BEG/END} in both branches of OP_STMT_WHEN and Place it outside the SUPER_INFO_IF block
+ * From:                            | To:
+ *   SUPER_INFO_IF                  | {
+ *     SUPER_INFO_ASSIGN_BEG A      |   SUPER_INFO_ASSIGN_BEG A
+ *     xxx = yyy                    |   SUPER_INFO_ASSIGN_BEG B
+ *     SUPER_INFO_ASSIGN_END A      |   SUPER_INFO_IF
+ *   SUPER_INFO_ELSE                |      xxx = yyy
+ *     SUPER_INFO_ASSIGN_BEG A      |   SUPER_INFO_ELSE
+ *     SUPER_INFO_ASSIGN_BEG B      |      xxx = zzz
+ *     xxx = zzz                    |      iii = jjj
+ *     iii = jjj                    |   SUPER_INFO_DEDENT
+ *     SUPER_INFO_ASSIGN_END A      |   SUPER_INFO_ASSIGN_END A
+ *     SUPER_INFO_ASSIGN_END B      |   SUPER_INFO_ASSIGN_END B
+ *   SUPER_INFO_DEDENT              | }
+ */
+      if (!insts_branch_assign[1].empty()) {
+        insts.insert(insts.begin() + static_cast<std::ptrdiff_t>(if_marker), std::make_move_iterator(insts_branch_assign[0].begin()), std::make_move_iterator(insts_branch_assign[0].end()));
+        insts.insert(insts.end(), std::make_move_iterator(insts_branch_assign[1].begin()), std::make_move_iterator(insts_branch_assign[1].end()));
+        /* avoid {\n{ */
+        if (if_marker != 0 && insts.at(if_marker - 1).infoType != SUPER_INFO_IF && insts.at(if_marker - 1).infoType != SUPER_INFO_ELSE) {
+          insts.insert(insts.begin() + static_cast<std::ptrdiff_t>(if_marker), InstInfo("{", SUPER_INFO_INDENT));
+          insts.emplace_back("}", SUPER_INFO_DEDENT);
+        }
+      }
       break;
     }
     case OP_STMT_NODE: {
@@ -1962,22 +1992,34 @@ void StmtNode::compute(std::vector<InstInfo>& insts) {
       valInfo* linfo = tree->getlval()->compute(node, INVALID_LVALUE, false);
       valInfo* rinfo = tree->getRoot()->compute(node, linfo->valStr, true);
       if (rinfo->status == VAL_FINISH || node->type == NODE_SPECIAL) { // printf / assert
-        insts.push_back(InstInfo(rinfo->valStr));
+        insts.emplace_back(rinfo->valStr);
       } else if (rinfo->status == VAL_INVALID) {
       } else if (rinfo->opNum >= 0) {
         if (rinfo->valStr != linfo->valStr) {
-          if (belong) insts.push_back(InstInfo(SUPER_INFO_ASSIGN_BEG, belong));
-          if (isSubArray(linfo->valStr, node)) {
-            insts.push_back(InstInfo(arrayCopy(linfo->valStr, node, rinfo)));
-          } else {
-            insts.push_back(InstInfo(format("%s = %s;", linfo->valStr.c_str(), rinfo->valStr.c_str())));
+          if (belong){
+            if (assign_insts) assign_insts[0].emplace(SUPER_INFO_ASSIGN_BEG, belong);
+            else insts.emplace_back(SUPER_INFO_ASSIGN_BEG, belong);
           }
-          if (belong) insts.push_back(InstInfo(SUPER_INFO_ASSIGN_END, belong));
+          if (isSubArray(linfo->valStr, node)) {
+            insts.emplace_back(arrayCopy(linfo->valStr, node, rinfo));
+          } else {
+            insts.emplace_back(format("%s = %s;", linfo->valStr.c_str(), rinfo->valStr.c_str()));
+          }
+          if (belong) {
+            if (assign_insts) assign_insts[1].emplace(SUPER_INFO_ASSIGN_END, belong);
+            else insts.emplace_back(SUPER_INFO_ASSIGN_END, belong);
+          }
         }
       } else {
-        if (belong) insts.push_back(InstInfo(SUPER_INFO_ASSIGN_BEG, belong));
-        insts.push_back(InstInfo(rinfo->valStr));
-        if (belong) insts.push_back(InstInfo(SUPER_INFO_ASSIGN_END, belong));
+        if (belong) {
+          if (assign_insts) assign_insts[0].emplace(SUPER_INFO_ASSIGN_BEG, belong);
+          else insts.emplace_back(SUPER_INFO_ASSIGN_BEG, belong);
+        }
+        insts.emplace_back(rinfo->valStr);
+        if (belong) {
+          if (assign_insts) assign_insts[1].emplace(SUPER_INFO_ASSIGN_END, belong);
+          else insts.emplace_back(SUPER_INFO_ASSIGN_END, belong);
+        }
       }
       break;
     }
