@@ -1939,6 +1939,32 @@ valInfo* Node::compute() {
   return ret;
 }
 
+void extractCommonInstInfo(std::set<InstInfo>& s1, std::set<InstInfo>& s2, std::set<InstInfo>& common) {
+  common.clear();
+
+  std::set_intersection(
+      s1.begin(), s1.end(),
+      s2.begin(), s2.end(),
+      std::inserter(common, common.end())
+  );
+
+  std::set<InstInfo> s1_unique;
+  std::set_difference(
+      s1.begin(), s1.end(),
+      common.begin(), common.end(),
+      std::inserter(s1_unique, s1_unique.end())
+  );
+
+  std::set<InstInfo> s2_unique;
+  std::set_difference(
+      s2.begin(), s2.end(),
+      common.begin(), common.end(),
+      std::inserter(s2_unique, s2_unique.end())
+  );
+
+  s1.swap(s1_unique);
+  s2.swap(s2_unique);
+}
 void StmtNode::compute(std::vector<InstInfo>& insts, std::set<InstInfo> assign_insts[]) {
   switch (type) {
     case OP_STMT_SEQ:
@@ -1948,17 +1974,37 @@ void StmtNode::compute(std::vector<InstInfo>& insts, std::set<InstInfo> assign_i
       break;
     case OP_STMT_WHEN: {
       Assert(getChild(0)->isENode, "invalid when condition\n");
-      std::set<InstInfo> insts_branch_assign[2]; // Collector for all the SUPER_INFO_ASSIGN_{BEG/END}
+      std::set<InstInfo> insts_branch_if_assign[2],insts_branch_else_assign[2]; // Collector for all the SUPER_INFO_ASSIGN_{BEG/END}
+      std::set<InstInfo> insts_branch_common_assign[2];
+
+      std::vector<InstInfo> branch_if_insts, branch_else_insts;
       valInfo* cond = getChild(0)->enode->compute(nullptr, INVALID_LVALUE, false);
-      insts.emplace_back(format("if %s {", addBracket(cond->valStr).c_str()), SUPER_INFO_IF);
-      auto if_marker = insts.size() - 1;
-      getChild(1)->compute(insts,insts_branch_assign);
+      getChild(1)->compute(branch_if_insts,insts_branch_if_assign);
       /* Don't emit empty else block */
       if (!getChild(2)->child.empty()) {
-        insts.emplace_back("} else {", SUPER_INFO_ELSE);
-        getChild(2)->compute(insts, insts_branch_assign);
+        //insts.emplace_back("} else {", SUPER_INFO_ELSE);
+        getChild(2)->compute(branch_else_insts, insts_branch_else_assign);
       }
-      insts.emplace_back("}", SUPER_INFO_DEDENT); // if block
+
+      extractCommonInstInfo(insts_branch_if_assign[0], insts_branch_else_assign[0], insts_branch_common_assign[0]);
+      extractCommonInstInfo(insts_branch_if_assign[1], insts_branch_else_assign[1], insts_branch_common_assign[1]);
+
+      insts.emplace_back("{/*fff*/", SUPER_INFO_INDENT);
+      insts.insert(insts.end(), std::make_move_iterator(insts_branch_common_assign[0].begin()), std::make_move_iterator(insts_branch_common_assign[0].end()));
+      insts.emplace_back(format("if %s {", addBracket(cond->valStr).c_str()), SUPER_INFO_IF);
+      insts.insert(insts.end(), std::make_move_iterator(insts_branch_if_assign[0].begin()), std::make_move_iterator(insts_branch_if_assign[0].end()));
+      insts.insert(insts.end(), branch_if_insts.begin(), branch_if_insts.end());
+      insts.insert(insts.end(), std::make_move_iterator(insts_branch_if_assign[1].begin()), std::make_move_iterator(insts_branch_if_assign[1].end()));
+      if (!getChild(2)->child.empty()) {
+        insts.emplace_back("} else {", SUPER_INFO_ELSE);
+        insts.insert(insts.end(), std::make_move_iterator(insts_branch_else_assign[0].begin()), std::make_move_iterator(insts_branch_else_assign[0].end()));
+        insts.insert(insts.end(), branch_else_insts.begin(), branch_else_insts.end());
+        insts.insert(insts.end(), std::make_move_iterator(insts_branch_else_assign[1].begin()), std::make_move_iterator(insts_branch_else_assign[1].end()));
+      }
+      insts.emplace_back("}/*eee*/", SUPER_INFO_DEDENT); // if block
+      insts.insert(insts.end(), std::make_move_iterator(insts_branch_common_assign[1].begin()), std::make_move_iterator(insts_branch_common_assign[1].end()));
+
+      insts.emplace_back("}", SUPER_INFO_DEDENT);
 /*
  * Deduplicate SUPER_INFO_ASSIGN_{BEG/END} in both branches of OP_STMT_WHEN and Place it outside the SUPER_INFO_IF block
  * From:                            | To:
@@ -1975,15 +2021,15 @@ void StmtNode::compute(std::vector<InstInfo>& insts, std::set<InstInfo> assign_i
  *     SUPER_INFO_ASSIGN_END B      |   SUPER_INFO_ASSIGN_END B
  *   SUPER_INFO_DEDENT              | }
  */
-      if (!insts_branch_assign[1].empty()) {
+    /*  if (!insts_branch_assign[1].empty()) {
         insts.insert(insts.begin() + static_cast<std::ptrdiff_t>(if_marker), std::make_move_iterator(insts_branch_assign[0].begin()), std::make_move_iterator(insts_branch_assign[0].end()));
         insts.insert(insts.end(), std::make_move_iterator(insts_branch_assign[1].begin()), std::make_move_iterator(insts_branch_assign[1].end()));
-        /* avoid {\n{ */
+        // avoid {\n{
         if (if_marker != 0 && insts.at(if_marker - 1).infoType != SUPER_INFO_IF && insts.at(if_marker - 1).infoType != SUPER_INFO_ELSE) {
           insts.insert(insts.begin() + static_cast<std::ptrdiff_t>(if_marker), InstInfo("{", SUPER_INFO_INDENT));
           insts.emplace_back("}", SUPER_INFO_DEDENT);
         }
-      }
+      }*/
       break;
     }
     case OP_STMT_NODE: {
