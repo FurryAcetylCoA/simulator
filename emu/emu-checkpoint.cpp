@@ -185,20 +185,17 @@ void load_program(void* dest,const char* filename) {
 
 // load gcpt
 void overwrite_ram(void* mem, const char* filename) {
+  const std::streamsize load_gcpt_size = 0xE00; // Load a fixed size of gcpt.bin
   std::fstream fs(filename, std::ios::binary | std::ios::in);
   if (!fs.is_open()) {
     printf("Failed to open: %s\n", filename);
     exit(EXIT_FAILURE);
   }
-  fs.seekg(0, std::ios::end);
-  auto file_size = fs.tellg();
-  file_size = 0xe00;
-  fs.seekg(0, std::ios::beg);
-  if (!fs.read((char*)mem, file_size)) {
+  if (!fs.read((char*)mem, load_gcpt_size)) {
     printf("Failed to read: %s\n", filename);
     exit(EXIT_FAILURE);
   }
-  std::cout<< "size of gcpt is " << file_size << std::endl;
+  std::cout<< "Load size of gcpt is 0x" << std::hex << load_gcpt_size << std::endl;
 
   fs.close();
 }
