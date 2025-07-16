@@ -70,14 +70,14 @@ info        [0-9A-Za-z.{}:,/ _-]+
                   }
                 }
 
-<intid>{int}    { yylval->strVal = strdup(yytext); return token::ID; }
+<intid>{int}    { yylval->emplace<std::string>(yytext); return token::ID; }
 <intid>"`"      {  BEGIN(normal); }
 
 <info>"["       { }
-<info>{info}*   { yylval->strVal = strdup(yytext); return token::Info; }
+<info>{info}*   { yylval->emplace<std::string>(yytext); return token::Info; }
 <info>"]"       { BEGIN(normal); }
 
-<dotId>{int_dec}|{id} { yylval->name = strdup(yytext); BEGIN(normal); return token::ID; }
+<dotId>{int_dec}|{id} { yylval->emplace<std::string>(yytext); BEGIN(normal); return token::ID; }
 <dotId>"`"      { BEGIN(intid); }
 
 <anno>"]]"      { BEGIN(normal); }
@@ -88,25 +88,25 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>"%[["   { BEGIN(anno); }
 <normal>"<<"    { return token::DoubleLeft; }
 <normal>">>"    { return token::DoubleRight; }
-<normal>Clock                   { yylval->typeGround = "Clock";      return token::Clock; }
-<normal>Reset                   { yylval->typeGround = "Reset";      return token::Reset; }
-<normal>AsyncReset              { yylval->typeGround = "AsyncReset"; return token::AsyReset; }
-<normal>UInt                    { yylval->typeGround = "UInt";       return token::IntType; }
-<normal>SInt                    { yylval->typeGround = "SInt";       return token::IntType; }
-<normal>Probe                   { yylval->typeGround = "Probe";      return token::ProbeType; }
-<normal>probe                   { yylval->typeGround = "probe";      return token::Probe; }
-<normal>Analog                  { yylval->typeGround = "Analog";     return token::anaType; }
-<normal>Fixed                   { yylval->typeGround = "Fixed";      return token::FixedType; }
+<normal>Clock                   { yylval->emplace<std::string>("Clock");      return token::Clock; }
+<normal>Reset                   { yylval->emplace<std::string>("Reset");      return token::Reset; }
+<normal>AsyncReset              { yylval->emplace<std::string>("AsyncReset"); return token::AsyReset; }
+<normal>UInt                    { yylval->emplace<std::string>("UInt");       return token::IntType; }
+<normal>SInt                    { yylval->emplace<std::string>("SInt");       return token::IntType; }
+<normal>Probe                   { yylval->emplace<std::string>("Probe");      return token::ProbeType; }
+<normal>probe                   { yylval->emplace<std::string>("probe");      return token::Probe; }
+<normal>Analog                  { yylval->emplace<std::string>("Analog");     return token::anaType; }
+<normal>Fixed                   { yylval->emplace<std::string>("Fixed");      return token::FixedType; }
 <normal>flip                    { return token::Flip;}
-<normal>(add|sub|mul|div|rem|lt|leq|gt|geq|eq|neq|dshl|dshr|and|or|xor|cat)[(] { parenthesis_num++; yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E2OP; }
-<normal>(asUInt|asSInt|asClock|asAsyncReset|cvt|neg|not|andr|orr|xorr)[(] { parenthesis_num ++; yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E1OP; }
-<normal>(pad|shl|shr|head|tail)[(]   { parenthesis_num ++; yylval->typeOP = strndup(yytext, strlen(yytext)-1); return token::E1I1OP; }
-<normal>bits[(]                 { parenthesis_num ++; yylval->typeOP = "bits"; return token::E1I2OP; }
+<normal>(add|sub|mul|div|rem|lt|leq|gt|geq|eq|neq|dshl|dshr|and|or|xor|cat)[(] { parenthesis_num++; yylval->emplace<std::string>(yytext, yyleng-1); return token::E2OP; }
+<normal>(asUInt|asSInt|asClock|asAsyncReset|cvt|neg|not|andr|orr|xorr)[(] { parenthesis_num ++; yylval->emplace<std::string>(yytext, yyleng-1); return token::E1OP; }
+<normal>(pad|shl|shr|head|tail)[(]   { parenthesis_num ++; yylval->emplace<std::string>(yytext, yyleng - 1); return token::E1I1OP; }
+<normal>bits[(]                 { parenthesis_num ++; yylval->emplace<std::string>("bits"); return token::E1I2OP; }
 <normal>mux                     { return token::Mux; }
 <normal>validif                 { return token::Validif; }
-<normal>old                     { yylval->typeRUW = "old"; return token::Ruw; }
-<normal>new                     { yylval->typeRUW = "new"; return token::Ruw; }
-<normal>undefined               { yylval->typeRUW = "undefined"; return token::Ruw; }
+<normal>old                     { yylval->emplace<std::string>("old"); return token::Ruw; }
+<normal>new                     { yylval->emplace<std::string>("new"); return token::Ruw; }
+<normal>undefined               { yylval->emplace<std::string>("undefined"); return token::Ruw; }
 <normal>mem                     { return token::Mem; }
 <normal>smem                    { return token::SMem; }
 <normal>cmem                    { return token::CMem; }
@@ -115,12 +115,12 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>infer                   { return token::Infer; }
 <normal>mport                   { return token::Mport; }
 <normal>rdwr                    { return token::Rdwr; }
-<normal>{int}                   { yylval->strVal = strdup(yytext); return token::INT; }
-<normal>{rint}                  { yylval->strVal = strdup(yytext); return token::RINT; }
+<normal>{int}                   { yylval->emplace<std::string>(yytext); return token::INT; }
+<normal>{rint}                  { yylval->emplace<std::string>(yytext); return token::RINT; }
 <normal>{int_dec}               { if (angle_num == 0 && square_num == 0 && parenthesis_num == 0 && bracket_num != 0) { \
-                                    yylval->name = strdup(yytext); return token::ID; \
+                                    yylval->emplace<std::string>(yytext); return token::ID; \
                                   } \
-                                  yylval->strVal = strdup(yytext); return token::INT; }
+                                  yylval->emplace<std::string>(yytext); return token::INT; }
 <normal>data-type               { return token::DataType; }
 <normal>depth                   { return token::Depth; }
 <normal>read-latency            { return token::ReadLatency; }
@@ -158,8 +158,8 @@ info        [0-9A-Za-z.{}:,/ _-]+
 <normal>public                  { return token::Public; }
 <normal>define                  { return token::Define; }
 <normal>const                   { return token::Const; }
-<normal>{id}                    { yylval->name = strdup(yytext); return token::ID; }
-<normal>{string}                { yylval->strVal = strdup(yytext); return token::String; }
+<normal>{id}                    { yylval->emplace<std::string>(yytext); return token::ID; }
+<normal>{string}                { yylval->emplace<std::string>(yytext); return token::String; }
 <normal>"=>"                    { return token::RightArrow; }
 <normal>"<-"                    { return token::Leftarrow; }
 <normal>"<"                     { angle_num ++; return yytext[0];}

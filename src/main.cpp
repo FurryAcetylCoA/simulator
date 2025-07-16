@@ -14,7 +14,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-PNode* parseFIR(char *strbuf);
+std::unique_ptr<PNode> parseFIR(char *strbuf);
 void preorder_traversal(PNode* root);
 graph* AST2Graph(PNode* root);
 void inferAllWidth();
@@ -136,12 +136,12 @@ int main(int argc, char** argv) {
   char *strbuf;
   FUNC_TIMER(strbuf = readFile(InputFileName, size, mapSize));
 
-  PNode* globalRoot;
-  FUNC_TIMER(globalRoot= parseFIR(strbuf));
+  std::unique_ptr<PNode> globalRoot;
+  FUNC_TIMER(globalRoot = parseFIR(strbuf));
   munmap(strbuf, mapSize);
 
-  FUNC_WRAPPER(g = AST2Graph(globalRoot), "Init");
-
+  FUNC_WRAPPER(g = AST2Graph(globalRoot.get()), "Init");
+  globalRoot.reset();
   FUNC_TIMER(g->splitArray());
 
   FUNC_TIMER(g->detectLoop());

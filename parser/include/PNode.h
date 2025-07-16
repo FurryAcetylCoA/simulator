@@ -6,6 +6,8 @@
 #ifndef PNODE_H
 #define PNODE_H
 
+#include <memory>
+
 /**
  * @class PList
  * @brief A class representing a list of PNodes.
@@ -111,7 +113,7 @@ class PNode {
   /**
    * @brief A vector of child nodes.
    */
-  std::vector<PNode*> child;
+  std::vector<std::unique_ptr<PNode>> child;
   std::string info;
   std::string name;
   std::vector<std::string> extraInfo;
@@ -130,9 +132,9 @@ class PNode {
    */
   std::string consVal;
 
-  void appendChild(PNode* p);
-  void appendExtraInfo(const char* info);
-  void appendChildList(PList* plist);
+  void appendChild(std::unique_ptr<PNode> p);
+  void appendExtraInfo(const std::string& info);
+  void appendChildList(std::unique_ptr<PList> &plist);
   void setWidth(int _width);
   int getChildNum();
   PNode* getChild(int idx);
@@ -153,18 +155,43 @@ class PList {
    *
    * @param pnode
    */
-  PList(PNode* pnode) { siblings.push_back(pnode); }
+  PList(std::unique_ptr<PNode> pnode) { siblings.push_back(std::move(pnode)); }
   PList() {}
 
-  std::vector<PNode*> siblings;
+  std::vector<std::unique_ptr<PNode>> siblings;
 
-  void append(PNode* pnode);
-  void append(int num, ...);
-  void concat(PList* plist);
+  void append(std::unique_ptr<PNode> pnode);
+  //void append(int num, ...);
+  void concat(std::unique_ptr<PList> plist);
 };
 
-PNode* newNode(PNodeType type, int lineno, const char* info, const char* name, int num, ...);
-PNode* newNode(PNodeType type, int lineno, const char* name, int num, ...);
-PNode* newNode(PNodeType type, int lineno, const char* info, const char* name);
+template<typename... Children>
+std::unique_ptr<PNode> newNode(PNodeType type, int lineno, std::string& name, std::string& info , Children&&... children) {
+  auto parent = std::make_unique<PNode>(type, lineno);
+
+  parent->name = name; // Note: this is copy, but changing this to move with support of
+  parent->info = info; // tmp empty string is tricky...
+
+  if constexpr (sizeof...(children) > 0) {
+    (parent->child.push_back(std::forward<Children>(children)), ...);
+  }
+  return parent;
+}
+
+template<typename... Children>
+std::unique_ptr<PNode> newNode(PNodeType type, int lineno, std::string& name, Children&&... children) {
+  auto parent = std::make_unique<PNode>(type, lineno);
+
+  parent->name = name;
+
+  if constexpr (sizeof...(children) > 0) {
+    (parent->child.push_back(std::forward<Children>(children)), ...);
+  }
+  return parent;
+}
+//std::unique_ptr<PNode> newNode(PNodeType type, int lineno, const char* info, const char* name, int num, ...);
+//std::unique_ptr<PNode> newNode(PNodeType type, int lineno, const char* name, int num, ...);
+//std::unique_ptr<PNode> newNode(PNodeType type, int lineno, const char* info, const char* name);
+std::unique_ptr<PNode> newNode(PNodeType type, int lineno); //没有名称的会用
 
 #endif

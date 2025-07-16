@@ -17,8 +17,8 @@ namespace Parser {
 
 class Lexical : public yyFlexLexer {
 public:
-  PNode* root = NULL;
-  PList* list = NULL;
+  std::unique_ptr<PNode> root = nullptr;
+  std::unique_ptr<PList> list = nullptr;
   Lexical(std::istream& arg_yyin, std::ostream& arg_yyout) : Lexical(&arg_yyin, &arg_yyout) {}
   Lexical(std::istream* arg_yyin = nullptr, std::ostream* arg_yyout = nullptr) :
     yyFlexLexer(arg_yyin, arg_yyout) {

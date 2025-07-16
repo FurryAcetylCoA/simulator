@@ -17,8 +17,8 @@ typedef struct TaskRecord {
 static std::vector<TaskRecord> *taskQueue;
 static std::mutex m;
 static std::condition_variable cv;
-static PList **lists;
-static PNode *globalRoot;
+static std::unique_ptr<PList> *lists;
+static std::unique_ptr<PNode> globalRoot;
 
 void parseFunc(char *strbuf, int tid) {
   while (true) {
@@ -39,10 +39,10 @@ void parseFunc(char *strbuf, int tid) {
     lexical->set_lineno(e.lineno);
     syntax->parse();
 
-    lists[e.id] = lexical->list;
+    lists[e.id] = std::move(lexical->list);
     if (e.id == 0) {
-      assert(lexical->root != NULL);
-      globalRoot = lexical->root;
+      assert(lexical->root != nullptr);
+      globalRoot = std::move(lexical->root);
     }
 
     delete syntax;
@@ -51,7 +51,7 @@ void parseFunc(char *strbuf, int tid) {
   }
 }
 
-PNode* parseFIR(char *strbuf) {
+std::unique_ptr<PNode> parseFIR(char *strbuf) {
   taskQueue = new std::vector<TaskRecord>;
   std::future<void> *threads = new std::future<void> [NR_THREAD];
 
@@ -84,7 +84,8 @@ PNode* parseFIR(char *strbuf) {
   }
   printf("[Parser] using %d threads to parse %d modules with %d tasks\n",
       NR_THREAD, modules, id);
-  lists = new PList* [id];
+  //lists = new PList* [id];
+  lists = new std::unique_ptr<PList> [id];
   for (int i = 0; i < NR_THREAD; i ++) {
     taskQueue->push_back(TaskRecord{0, 0, -1, -1}); // exit flags
   }
@@ -107,13 +108,13 @@ PNode* parseFIR(char *strbuf) {
   printf("[Parser] merging lists...\n");
   TIMER_START(MergeList);
   for (int i = 1; i < id; i ++) {
-    lists[0]->concat(lists[i]);
+    lists[0]->concat(std::move(lists[i]));
   }
-  globalRoot->child.assign(lists[0]->siblings.begin(), lists[0]->siblings.end());
+  globalRoot->child.assign(std::make_move_iterator(lists[0]->siblings.begin()), std::make_move_iterator(lists[0]->siblings.end()));
   TIMER_END(MergeList);
 
   delete [] lists;
   delete [] threads;
   delete taskQueue;
-  return globalRoot;
+  return std::move(globalRoot);
 }

@@ -16,8 +16,8 @@ static inline int bit(char c, int base) {
   return -1;
 }
 
-int p_stoi(const char* str) {  // oct/dec/hex string to int
-  int len = strlen(str);
+int p_stoi(std::string str) {  // oct/dec/hex string to int
+  int len = str.length();
   if (len == 0) return 0;
 
   int val  = 0;
@@ -34,4 +34,7 @@ int p_stoi(const char* str) {  // oct/dec/hex string to int
   if (neg) return -val;
 
   return val;
+}
+int p_stoi(const char* str) {  // oct/dec/hex string to int
+  return p_stoi(std::string(str));
 }
