@@ -3,7 +3,6 @@
   #include "common.h"
   #include "syntax.hh"
   #include "Parser.h"
-  std::string no_name{};
 int p_stoi(std::string str); // 为啥parser有一个专门的stoi
 //   int  yylex (yy::parser::value_type* yylval);
 %}
@@ -30,9 +29,9 @@ int p_stoi(std::string str); // 为啥parser有一个专门的stoi
     #define synlineno() scanner->lineno()
     #define yylex(x) scanner->lex(x)
     // #define yylex(x) scanner->lex_debug(x)
-}
+    std::string no_name{}; // Do Not std::move this
 
-%destructor { $$.release(); } <std::unique_ptr<PNode>> <std::unique_ptr<PList>>
+}
 
 /* token */
 %token DoubleLeft "<<"
@@ -64,11 +63,11 @@ int p_stoi(std::string str); // 为啥parser有一个专门的stoi
 
 
 %%
-/* remove version */
-circuit: version Circuit ALLID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, synlineno(), $3, $6 ); scanner->root = std::move($$); scanner->list = std::move($8); (void)yynerrs_;}
-  | INDENT cir_mods DEDENT { scanner->list = std::move($2); }
+/* circuit is always the root and version is ignored */
+circuit: version Circuit ALLID ':' annotations info INDENT cir_mods DEDENT { $$ = newNode(P_CIRCUIT, synlineno(), $3, $6 ); scanner->root = std::move($$); scanner->list = std::move($8); $$ = nullptr; (void)yynerrs_;}
+  | INDENT cir_mods DEDENT { scanner->list = std::move($2); $$ = nullptr;}
   ;
-ALLID: ID {$$ = $1; }
+ALLID: ID {$$ = std::move($1); }
     | Inst { $$ = "inst"; }
     | Printf { $$ = "printf"; }
     | Assert { $$ = "assert"; }
@@ -95,15 +94,16 @@ ALLID: ID {$$ = $1; }
 /* linecol: INT ':' INT    { $$ = malloc(strlen($1) + strlen($2) + 2); strcpy($$, $1); str$1 + ":" + $3}
     ; */
 info:               { $$ = "";}
-    | Info          { $$ = $1;}
+    | Info          { $$ = std::move($1);}
     ;
 /* type definition */
 width:                { $$ = -1; } /* infered width */
     | '<' INT '>'     { $$ = p_stoi($2); }
     ;
-binary_point:
-    | "<<" INT ">>"   { TODO(); }
-    ;
+// binary_point: // Removed in firrtl 2.0
+//    | "<<" INT ">>"   { TODO();}
+//    ;
+
 type_ground: Clock              { $$ = newNode(P_Clock, synlineno()); }
     | Reset                     { $$ = newNode(P_RESET, synlineno()); $$->setWidth(1); $$->setSign(0);}
     | AsyReset                  { $$ = newNode(P_ASYRESET, synlineno()); $$->setWidth(1); $$->setSign(0);}
@@ -112,14 +112,14 @@ type_ground: Clock              { $$ = newNode(P_Clock, synlineno()); }
     | ProbeType '<' IntType width '>' { $$ = newNode(P_INT_TYPE, synlineno(), $3); $$->setWidth($4); $$->setSign($3[0] == 'S'); }
     | ProbeType '<' IntType '<' INT ">>" { $$ = newNode(P_INT_TYPE, synlineno(), $3); $$->setWidth(p_stoi($5)); $$->setSign($3[0] == 'S'); }
     | anaType width             { TODO(); }
-    | FixedType width binary_point  { TODO(); }
+//    | FixedType width binary_point  { TODO(); } // Removed in firrtl 2.0
     ;
 fields:                 { $$ = std::make_unique<PList>(); }
     | fields ',' field  { $$ = std::move($1); $$->append(std::move($3)); }
     | field             { $$ = std::make_unique<PList>(std::move($1)); }
     ;
-type_aggregate: '{' fields '}'  { $$ = newNode(P_AG_FIELDS, synlineno()); $$->appendChildList($2); }
-    | type '[' INT ']'          { $$ = newNode(P_AG_ARRAY, synlineno(), no_name, std::move($1)); $$->appendExtraInfo(std::move($3)); }
+type_aggregate: '{' fields '}'  { $$ = newNode(P_AG_FIELDS, synlineno()); $$->appendChildList(std::move($2)); }
+    | type '[' INT ']'          { $$ = newNode(P_AG_ARRAY, synlineno(), no_name, std::move($1)); $$->appendExtraInfo($3); }
     ;
 field: ALLID ':' type { $$ = newNode(P_FIELD, synlineno(), $1, std::move($3)); }
     | Flip ALLID ':' type  { $$ = newNode(P_FLIP_FIELD, synlineno(), $2, std::move($4)); }

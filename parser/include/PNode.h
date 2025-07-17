@@ -134,7 +134,7 @@ class PNode {
 
   void appendChild(std::unique_ptr<PNode> p);
   void appendExtraInfo(const std::string& info);
-  void appendChildList(std::unique_ptr<PList> &plist);
+  void appendChildList(std::unique_ptr<PList> plist);
   void setWidth(int _width);
   int getChildNum();
   PNode* getChild(int idx);
@@ -161,7 +161,6 @@ class PList {
   std::vector<std::unique_ptr<PNode>> siblings;
 
   void append(std::unique_ptr<PNode> pnode);
-  //void append(int num, ...);
   void concat(std::unique_ptr<PList> plist);
 };
 
@@ -170,7 +169,7 @@ std::unique_ptr<PNode> newNode(PNodeType type, int lineno, std::string& name, st
   auto parent = std::make_unique<PNode>(type, lineno);
 
   parent->name = name; // Note: this is copy, but changing this to move with support of
-  parent->info = info; // tmp empty string is tricky...
+  parent->info = info; // RValue string is tricky. And will eventually lead to ambiguous template
 
   if constexpr (sizeof...(children) > 0) {
     (parent->child.push_back(std::forward<Children>(children)), ...);
@@ -178,7 +177,7 @@ std::unique_ptr<PNode> newNode(PNodeType type, int lineno, std::string& name, st
   return parent;
 }
 
-template<typename... Children>
+template <typename... Children>
 std::unique_ptr<PNode> newNode(PNodeType type, int lineno, std::string& name, Children&&... children) {
   auto parent = std::make_unique<PNode>(type, lineno);
 
@@ -189,9 +188,11 @@ std::unique_ptr<PNode> newNode(PNodeType type, int lineno, std::string& name, Ch
   }
   return parent;
 }
-//std::unique_ptr<PNode> newNode(PNodeType type, int lineno, const char* info, const char* name, int num, ...);
-//std::unique_ptr<PNode> newNode(PNodeType type, int lineno, const char* name, int num, ...);
-//std::unique_ptr<PNode> newNode(PNodeType type, int lineno, const char* info, const char* name);
-std::unique_ptr<PNode> newNode(PNodeType type, int lineno); //没有名称的会用
+
+inline std::unique_ptr<PNode> newNode(PNodeType type, int lineno) {
+  auto parent = std::make_unique<PNode>(type, lineno);
+  return parent;
+}
+
 
 #endif
