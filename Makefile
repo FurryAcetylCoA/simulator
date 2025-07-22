@@ -198,7 +198,7 @@ EMU_SRCS += $(EMU_MAIN_SRCS) $(EMU_GEN_SRCS)
 
 EMU_CFLAGS := -O1 -MMD $(addprefix -I, $(abspath $(GEN_CPP_DIR))) $(EMU_CFLAGS) # allow to overwrite optimization level
 EMU_CFLAGS += $(MODE_FLAGS) $(CFLAGS_DUT) -Wno-parentheses-equality
-EMU_CFLAGS += -fbracket-depth=2048
+EMU_CFLAGS += -fbracket-depth=2048 -Xclang -fexperimental-max-bitint-width=833399
 #EMU_CFLAGS += -fsanitize=address -fsanitize-address-use-after-scope
 #EMU_CFLAGS += -fsanitize=undefined -fsanitize=pointer-compare -fsanitize=pointer-subtract
 #EMU_CFLAGS += -pg -ggdb
@@ -361,7 +361,7 @@ diff:
 	set -o pipefail && $(TIME) $(MAKE) diff-internal 2>&1 | tee $(LOG_FILE)
 
 init:
-	git submodule update --init
+	git submodule update --init --progress
 	cd ready-to-run && bash init.sh
 
 gen-ref:
