@@ -4,7 +4,7 @@
 
 dutName ?= ysyx3
 MODE ?= 0
-mainargs ?= ready-to-run/bin/linux.bin
+mainargs ?= linux.bin
 # uncomment this line to let this file be part of dependency of each .o file
 THIS_MAKEFILE = Makefile
 
