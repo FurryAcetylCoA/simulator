@@ -361,8 +361,10 @@ diff:
 	set -o pipefail && $(TIME) $(MAKE) diff-internal 2>&1 | tee $(LOG_FILE)
 
 init:
-	git submodule update --init --progress
-	cd ready-to-run && bash init.sh
+	#git submodule update --init --progress
+	#cd ready-to-run && bash init.sh
+	@mkdir -p ready-to-run
+	cp *.fir ready-to-run
 
 gen-ref:
 	bash scripts/genReference.sh $(NAME) $(dutName) $(DIFF_VERSION)
