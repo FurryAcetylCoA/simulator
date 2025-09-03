@@ -158,6 +158,7 @@ $(foreach x, $(GSIM_SRCS), $(eval \
 $(eval $(call LD_TEMPLATE, $(GSIM_BIN), $(GSIM_OBJS), $(CXXFLAGS) -lgmp))
 
 build-gsim: $(GSIM_BIN)
+	@echo "Usage: $(abspath $(GSIM_BIN)) <design.json>"
 
 # Dependency
 -include $(GSIM_OBJS:.o=.d)
