@@ -112,10 +112,10 @@ target = $(GSIM_TARGET)
 endif
 
 SIMPOINT_VAR = $(if $(filter 1,$(SIMPOINT)),-simpoint,)
-
+all: build-gsim
 difftest: $(target)$(SIMPOINT_VAR)
 
-.PHONY: difftest
+.PHONY: difftest all
 
 ##############################################
 ### Building GSIM

@@ -1,0 +1,5 @@
+{"design":[
+{"id":"WIRE1", "op": "const", "value": "0h2", "width": 3, "sign" : false},
+{"id":"WIRE2", "io":"i","width":2,"sign":false},
+{"id":"WIRE3", "op": "ref", "ref_id": "WIRE1","io":"o"}
+]}
