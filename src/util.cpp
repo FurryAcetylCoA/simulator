@@ -62,7 +62,7 @@ std::string to_hex_string(BASIC_TYPE x) {
   return ret;
 }
 
-static std::map<std::string, OPType> expr2Map = {
+std::map<std::string, OPType> expr2Map = {
   {"add", OP_ADD},  {"sub", OP_SUB},  {"mul", OP_MUL},  {"div", OP_DIV},
   {"rem", OP_REM},  {"lt", OP_LT},  {"leq", OP_LEQ},  {"gt", OP_GT},
   {"geq", OP_GEQ},  {"eq", OP_EQ},  {"neq", OP_NEQ},  {"dshl", OP_DSHL},
@@ -86,7 +86,7 @@ OPType str2op_expr1(std::string name) {
   return expr1Map[name];
 }
 
-static std::map<std::string, OPType> expr1int1Map = {
+std::map<std::string, OPType> expr1int1Map = {
   {"pad", OP_PAD}, {"shl", OP_SHL}, {"shr", OP_SHR}, {"head", OP_HEAD}, {"tail", OP_TAIL},
 };
 

@@ -59,7 +59,7 @@ static inline Node* allocNode(NodeType type = NODE_OTHERS, std::string name = ""
   return node;
 }
 
-static inline void addSignal(std::string s, Node* n) {
+static inline void addSignal(const std::string& s, Node* n) {
   Assert(allSignals.find(s) == allSignals.end(), "Signal %s is already in allSignals\n", s.c_str());
   Assert(allAggr.find(s) == allAggr.end(), "Signal %s is already in allAggr\n", s.c_str());
   allSignals[s] = n;

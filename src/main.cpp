@@ -80,20 +80,21 @@ static char* parseCommandLine(int argc, char** argv) {
   int option_index;
   while ((Option = getopt_long(argc, argv, "-h", Table, &option_index)) != -1) {
     switch (Option) {
-      case 0: switch (option_index) {
-                case 1: globalConfig.EnableDumpGraph = true; break;
-                case 2: globalConfig.OutputDir = optarg; break;
-                case 3: sscanf(optarg, "%d", &globalConfig.SuperNodeMaxSize); break;
-                case 4: sscanf(optarg, "%d", &globalConfig.cppMaxSizeKB); break;
-                case 5: globalConfig.sep_module = optarg; break;
-                case 6: globalConfig.sep_aggr = optarg; break;
-                case 7: sscanf(optarg, "%d", &globalConfig.MergeWhenSize); break;
-                case 8: sscanf(optarg, "%d", &globalConfig.When2muxBound); break;
-                case 0:
-                default: printUsage(argv[0]); exit(EXIT_SUCCESS);
-              }
-              break;
-      case 1: return optarg; // InputFileName
+      case 0:
+        switch (option_index) {
+          case 1: globalConfig.EnableDumpGraph = true; break;
+          case 2: globalConfig.OutputDir = optarg; break;
+          case 3: sscanf(optarg, "%d", &globalConfig.SuperNodeMaxSize); break;
+          case 4: sscanf(optarg, "%d", &globalConfig.cppMaxSizeKB); break;
+          case 5: globalConfig.sep_module = optarg; break;
+          case 6: globalConfig.sep_aggr = optarg; break;
+          case 7: sscanf(optarg, "%d", &globalConfig.MergeWhenSize); break;
+          case 8: sscanf(optarg, "%d", &globalConfig.When2muxBound); break;
+          case 0:
+          default: printUsage(argv[0]); exit(EXIT_SUCCESS);
+        }
+        break;
+      case 1: return optarg;  // InputFileName
       case 'd': globalConfig.EnableDumpGraph = true; break;
       default: {
         printUsage(argv[0]);
@@ -104,7 +105,7 @@ static char* parseCommandLine(int argc, char** argv) {
   assert(0);
 }
 
-static char* readFile(const char *InputFileName, size_t &size, size_t &mapSize) {
+[[maybe_unused]] static char* readFile(const char *InputFileName, size_t &size, size_t &mapSize) {
   int fd = open(InputFileName, O_RDONLY);
   assert(fd != -1);
   struct stat sb;
@@ -126,22 +127,23 @@ static char* readFile(const char *InputFileName, size_t &size, size_t &mapSize) 
  * @param argv arg value string.
  * @return exit state.
  */
+graph* JSON2Graph(const char *InputFileName);
 int main(int argc, char** argv) {
   TIMER_START(total);
   graph* g = NULL;
   static int dumpIdx = 0;
   const char *InputFileName = parseCommandLine(argc, argv);
 
-  size_t size = 0, mapSize = 0;
-  char *strbuf;
-  FUNC_TIMER(strbuf = readFile(InputFileName, size, mapSize));
+  //size_t size = 0, mapSize = 0;
+  //char *strbuf;
+  //FUNC_TIMER(strbuf = readFile(InputFileName, size, mapSize));
 
-  PNode* globalRoot;
-  FUNC_TIMER(globalRoot= parseFIR(strbuf));
-  munmap(strbuf, mapSize);
+  //PNode* globalRoot;
+  //FUNC_TIMER(globalRoot= parseFIR(strbuf));
+  //munmap(strbuf, mapSize);
 
-  FUNC_WRAPPER(g = AST2Graph(globalRoot), "Init");
-
+  //FUNC_WRAPPER(g = AST2Graph(globalRoot), "Init");
+  g = JSON2Graph(InputFileName);
   FUNC_TIMER(g->splitArray());
 
   FUNC_TIMER(g->detectLoop());
